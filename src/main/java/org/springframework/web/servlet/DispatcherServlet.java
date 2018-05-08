@@ -1,5 +1,10 @@
 package org.springframework.web.servlet;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.Controller;
+
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -8,11 +13,16 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URL;
-import java.util.Properties;
+import java.util.*;
 
 public class DispatcherServlet extends HttpServlet {
     private Properties p = new Properties();
+    private List<String> classNames= new ArrayList<String>();
+    private Map<String,Object> ioc = new TreeMap<String, Object>();
+    private Map<String,Method> handlerMapping = new TreeMap<String, Method>();
     @Override
     public void init(ServletConfig config) throws ServletException {
         //1、加载配置文件
@@ -28,12 +38,72 @@ public class DispatcherServlet extends HttpServlet {
     }
 
     private void initHandleMapping() {
+        if (ioc.isEmpty()) return;
+        for (Map.Entry<String,Object> entry: ioc.entrySet()) {
+
+        }
     }
 
     private void doAutowried() {
+        if (ioc.isEmpty()) return;
+        for (Map.Entry<String,Object> entry: ioc.entrySet()) {
+            // 1、获得所有字段
+            Field[] fields = entry.getValue().getClass().getDeclaredFields();
+            for (Field f : fields) {
+                if(!f.isAnnotationPresent(Autowired.class)) continue;
+                Autowired autowired = f.getAnnotation(Autowired.class);
+                String beanName = f.getType().getName();
+
+                f.setAccessible(true);
+                try {
+                    f.set(entry.getValue(),ioc.get(beanName));
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                    continue;
+                }
+            }
+        }
     }
 
     private void doInstance() {
+        if (classNames.isEmpty()) return;
+        try{
+            for (String clazzName: classNames) {
+                Class clazz = Class.forName(clazzName);
+                //使用了注解的才进行实例化
+                // IoC容器规则： key默认使用类名首字母小写  用户自定义名字则用户优先选择 接口时可以使用接口的类型作为key
+                if (clazz.isAnnotationPresent(Controller.class)){
+                    String beanName = lowerFirstCase(clazz.getSimpleName());
+                    ioc.put(beanName,clazz.newInstance());
+                }
+                else if(clazz.isAnnotationPresent(Service.class)){
+                    Object instance = clazz.newInstance();
+
+                    // 1、默认使用类名首字母小写
+                    // 2、用户自定义名字则用户优先选择
+                    Service service = (Service) clazz.getAnnotation(Service.class);
+                    String beanName = service.value().trim();
+                    if ("".equals(beanName)) beanName = lowerFirstCase(clazz.getSimpleName());
+                    ioc.put(beanName,instance);
+                    // 3、接口时可以使用接口的类型作为key
+                    Class[] interfaces =  clazz.getInterfaces();
+                    for (Class clazz1: interfaces) {
+                        ioc.put(lowerFirstCase(clazz1.getSimpleName()),instance);
+                    }
+                }
+                else if(clazz.isAnnotationPresent(Repository.class)){
+                    Object instance = clazz.newInstance();
+                    Service service = (Service) clazz.getAnnotation(Service.class);
+                    String beanName = service.value().trim();
+                    if ("".equals(beanName)) beanName = lowerFirstCase(clazz.getSimpleName());
+                    ioc.put(beanName,instance);
+                }
+                else
+                    continue;
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     private void doScanner(String packageName) {
@@ -43,7 +113,8 @@ public class DispatcherServlet extends HttpServlet {
         for (File file:classDir.listFiles()) {
             if (file.isDirectory()) doScanner(packageName+"."+file.getName());
             else{
-
+                String clazzName = packageName+"."+file.getName().replace("class","");
+                classNames.add(clazzName);
             }
         }
     }
@@ -64,7 +135,16 @@ public class DispatcherServlet extends HttpServlet {
         }
     }
 
-
+    /**
+     * 首字母小写
+     * @param name
+     * @return
+     */
+    private String lowerFirstCase(String name){
+        char[] chars = name.toCharArray();
+        chars[0] += 32;
+        return chars.toString();
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
