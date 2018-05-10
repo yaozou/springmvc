@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -40,7 +42,20 @@ public class DispatcherServlet extends HttpServlet {
     private void initHandleMapping() {
         if (ioc.isEmpty()) return;
         for (Map.Entry<String,Object> entry: ioc.entrySet()) {
+            Class clazz = entry.getValue().getClass();
+            StringBuffer url = new StringBuffer();
+            if (clazz.isAnnotationPresent(Controller.class)){
+                Controller controller = (Controller) clazz.getAnnotation(Controller.class);
+                url.append(controller.value());
+            }
 
+            Method[] methods = clazz.getMethods();
+            for (Method method : methods) {
+                if (method.isAnnotationPresent(RequestMapping.class)){
+                    RequestMapping mapping = method.getAnnotation(RequestMapping.class);
+                    
+                }
+            }
         }
     }
 
