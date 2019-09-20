@@ -5,7 +5,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -20,11 +19,15 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 
+/**
+ * @author yaozou
+ */
 public class DispatcherServlet extends HttpServlet {
     private Properties p = new Properties();
-    private List<String> classNames= new ArrayList<String>();
-    private Map<String,Object> ioc = new TreeMap<String, Object>();
-    private Map<String,Method> handlerMapping = new TreeMap<String, Method>();
+    private List<String> classNames= new ArrayList<>();
+    private Map<String,Object> ioc = new TreeMap<>();
+    private Map<String,Method> handlerMapping = new TreeMap<>();
+
     @Override
     public void init(ServletConfig config) throws ServletException {
         //1、加载配置文件
@@ -40,10 +43,10 @@ public class DispatcherServlet extends HttpServlet {
     }
 
     private void initHandleMapping() {
-        if (ioc.isEmpty()) return;
+        if (ioc.isEmpty()){ return;}
         for (Map.Entry<String,Object> entry: ioc.entrySet()) {
             Class clazz = entry.getValue().getClass();
-            StringBuffer url = new StringBuffer();
+            StringBuilder url = new StringBuilder();
             if (clazz.isAnnotationPresent(Controller.class)){
                 Controller controller = (Controller) clazz.getAnnotation(Controller.class);
                 url.append(controller.value());
@@ -60,12 +63,12 @@ public class DispatcherServlet extends HttpServlet {
     }
 
     private void doAutowried() {
-        if (ioc.isEmpty()) return;
+        if (ioc.isEmpty()) {return;}
         for (Map.Entry<String,Object> entry: ioc.entrySet()) {
             // 1、获得所有字段
             Field[] fields = entry.getValue().getClass().getDeclaredFields();
             for (Field f : fields) {
-                if(!f.isAnnotationPresent(Autowired.class)) continue;
+                if(!f.isAnnotationPresent(Autowired.class)) {continue;}
                 Autowired autowired = f.getAnnotation(Autowired.class);
                 String beanName = f.getType().getName();
 
@@ -81,7 +84,7 @@ public class DispatcherServlet extends HttpServlet {
     }
 
     private void doInstance() {
-        if (classNames.isEmpty()) return;
+        if (classNames.isEmpty()){ return;}
         try{
             for (String clazzName: classNames) {
                 Class clazz = Class.forName(clazzName);
@@ -98,7 +101,7 @@ public class DispatcherServlet extends HttpServlet {
                     // 2、用户自定义名字则用户优先选择
                     Service service = (Service) clazz.getAnnotation(Service.class);
                     String beanName = service.value().trim();
-                    if ("".equals(beanName)) beanName = lowerFirstCase(clazz.getSimpleName());
+                    if ("".equals(beanName)) {beanName = lowerFirstCase(clazz.getSimpleName());}
                     ioc.put(beanName,instance);
                     // 3、接口时可以使用接口的类型作为key
                     Class[] interfaces =  clazz.getInterfaces();
@@ -110,11 +113,10 @@ public class DispatcherServlet extends HttpServlet {
                     Object instance = clazz.newInstance();
                     Service service = (Service) clazz.getAnnotation(Service.class);
                     String beanName = service.value().trim();
-                    if ("".equals(beanName)) beanName = lowerFirstCase(clazz.getSimpleName());
+                    if ("".equals(beanName)) {beanName = lowerFirstCase(clazz.getSimpleName());}
                     ioc.put(beanName,instance);
                 }
-                else
-                    continue;
+                else {continue;}
             }
         }catch (Exception e){
             e.printStackTrace();
@@ -126,7 +128,7 @@ public class DispatcherServlet extends HttpServlet {
         URL url = this.getClass().getClassLoader().getResource("/"+packageName.replaceAll("//.","/"));
         File classDir = new File(url.getFile());
         for (File file:classDir.listFiles()) {
-            if (file.isDirectory()) doScanner(packageName+"."+file.getName());
+            if (file.isDirectory()) {doScanner(packageName+"."+file.getName());}
             else{
                 String clazzName = packageName+"."+file.getName().replace("class","");
                 classNames.add(clazzName);
@@ -141,11 +143,12 @@ public class DispatcherServlet extends HttpServlet {
         } catch (IOException e) {
             e.printStackTrace();
         }finally {
-            if (is != null)
-            try {
-                is.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+            if (is != null){
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
